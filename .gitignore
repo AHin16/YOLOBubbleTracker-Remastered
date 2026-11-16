@@ -1,0 +1,50 @@
+# Model weights (large binary files)
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.engine
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ipynb_checkpoints/
+
+# IDE
+.idea/
+
+# Dependencies
+.deps/
+.tmp/
+
+# Ultralytics cache
+.ultralytics/
+
+# UI state
+.bubble_tracker_ui_state.json
+
+# Local datasets and demo media
+/data/videos/
+/BoT-SORT/assets/*.mov
+
+# Generated visualization results
+/visualization/outputs/
+gas_holdup_overlays/
+*_gas_holdup_overlays/
+*_gas_holdup.csv
+
+# Training outputs and logs
+/runs/
+/wandb/
+*.log
+
+# Virtual env
+venv/
+.venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,46 @@
+[
+  {
+    "Destination": "bubble_tracker_ui_qt.py",
+    "Source": "bubble_tracker_ui_qt.py"
+  },
+  {
+    "Destination": "ui_theme.py",
+    "Source": "ui_theme.py"
+  },
+  {
+    "Destination": "ui_theme.qss",
+    "Source": "ui_theme.qss"
+  },
+  {
+    "Destination": "ui_assets\\check.svg",
+    "Source": "ui_assets\\check.svg"
+  },
+  {
+    "Destination": "ui_assets\\chevron-down.svg",
+    "Source": "ui_assets\\chevron-down.svg"
+  },
+  {
+    "Destination": "ui_assets\\chevron-up.svg",
+    "Source": "ui_assets\\chevron-up.svg"
+  },
+  {
+    "Destination": "translations\\zh_CN.json",
+    "Source": "translations\\zh_CN.json"
+  },
+  {
+    "Destination": "START.bat",
+    "Source": "START.bat"
+  },
+  {
+    "Destination": "Readme.md",
+    "Source": "Readme.md"
+  },
+  {
+    "Destination": "docs\\images\\ui-tracking.png",
+    "Source": "preview-1480-0.png"
+  },
+  {
+    "Destination": "requirements.txt",
+    "Source": "requirements.txt"
+  }
+]
