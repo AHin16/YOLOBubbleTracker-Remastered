@@ -148,6 +148,7 @@ class BubbleTrackerQt(QObject):
         language_label = QLabel("Language")
         self.language_combo = QComboBox()
         self.language_combo.setObjectName("languageCombo")
+        self.language_combo.setMinimumWidth(110)
         self.language_combo.addItem("简体中文", "zh_CN")
         self.language_combo.addItem("English", "en")
         self.language_combo.setAccessibleName("Interface language")
@@ -182,6 +183,7 @@ class BubbleTrackerQt(QObject):
         )
         self._restoring_state = False
         self._refresh_language()
+        self.workflow_tabs.setCurrentWidget(self.home_page)
 
         self.window.show()
 

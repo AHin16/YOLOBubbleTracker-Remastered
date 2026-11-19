@@ -96,8 +96,8 @@ class GasHoldupWidget(QWidget):
         root_layout.setSpacing(10)
 
         subtitle = QLabel(
-            "Estimate gas holdup directly from YOLO instance-segmentation masks. "
-            "This workflow does not use tracking, IDs, velocity, or lifetime filters."
+            "Estimate gas holdup from equivalent spherical bubble volumes divided by ROI area "
+            "× field-of-view depth. Calibrate lengths and enter the actual depth before processing."
         )
         subtitle.setWordWrap(True)
         root_layout.addWidget(subtitle)
@@ -184,7 +184,18 @@ class GasHoldupWidget(QWidget):
             "Actual length corresponding to Calibration Pixels."
         )
         self.distance_unit_edit = QLineEdit("mm")
-        self.distance_unit_edit.setToolTip("Unit used for the calibrated bubble diameter.")
+        self.distance_unit_edit.setToolTip(
+            "Length unit shared by calibration, bubble diameter, and field-of-view depth."
+        )
+        self.view_depth_spin = QDoubleSpinBox()
+        self.view_depth_spin.setDecimals(6)
+        self.view_depth_spin.setRange(0.000001, 1000000000.0)
+        self.view_depth_spin.setSingleStep(0.1)
+        self.view_depth_spin.setValue(1.0)
+        self.view_depth_spin.setToolTip(
+            "Actual depth perpendicular to the image, in Distance Unit. "
+            "Replace the default with the experimental value."
+        )
         self.edge_policy_combo = QComboBox()
         for label, policy in (
             ("Include", EdgeBubblePolicy.INCLUDE),
@@ -217,6 +228,7 @@ class GasHoldupWidget(QWidget):
         self._add_form_row(form, "Calibration Pixels", self.calibration_pixels_spin)
         self._add_form_row(form, "Actual Length", self.calibration_length_spin)
         self._add_form_row(form, "Distance Unit", self.distance_unit_edit)
+        self._add_form_row(form, "Field-of-view Depth", self.view_depth_spin, self.view_depth_spin)
         self._add_form_row(form, "ROI (0 size = frame edge)", roi_widget)
         self._add_form_row(form, "Edge Bubble Policy", self.edge_policy_combo)
         return group
@@ -292,6 +304,8 @@ class GasHoldupWidget(QWidget):
         self.roi_area_value = QLabel("0 px")
         self.area_ratio_value = QLabel("0.00 %")
         self.gas_holdup_value = QLabel("0.00 %")
+        self.bubble_volume_value = QLabel("0 mm³")
+        self.roi_volume_value = QLabel("0 mm³")
         self.average_diameter_value = QLabel("0.0000 mm")
         self.average_diameter_px_value = QLabel("0.00 px")
         self.processing_fps_value = QLabel("--")
@@ -302,6 +316,8 @@ class GasHoldupWidget(QWidget):
             ("ROI Area", self.roi_area_value),
             ("Bubble Area Ratio", self.area_ratio_value),
             ("Gas Holdup", self.gas_holdup_value),
+            ("Total Bubble Volume", self.bubble_volume_value),
+            ("ROI Volume", self.roi_volume_value),
             ("Average Bubble Diameter", self.average_diameter_value),
             ("Average Bubble Diameter (px)", self.average_diameter_px_value),
             ("Processing FPS", self.processing_fps_value),
@@ -329,6 +345,8 @@ class GasHoldupWidget(QWidget):
         self.overlay_field.button.clicked.connect(self._browse_overlay_folder)
         self.csv_field.button.clicked.connect(self._browse_output_csv)
         self.input_folder_edit.textChanged.connect(self._update_auto_outputs)
+        self.distance_unit_edit.textChanged.connect(self._update_depth_unit)
+        self._update_depth_unit()
         self.high_quality_check.toggled.connect(self._update_quality_controls)
         self.start_button.clicked.connect(self.start_processing)
         self.stop_button.clicked.connect(self.stop_processing)
@@ -354,6 +372,7 @@ class GasHoldupWidget(QWidget):
             self.calibration_pixels_spin,
             self.calibration_length_spin,
             self.distance_unit_edit,
+            self.view_depth_spin,
             self.roi_x_spin,
             self.roi_y_spin,
             self.roi_width_spin,
@@ -368,6 +387,9 @@ class GasHoldupWidget(QWidget):
         self.input_width_spin.setEnabled(bool(enabled))
         self.input_height_spin.setEnabled(bool(enabled))
 
+    def _update_depth_unit(self):
+        self.view_depth_spin.setSuffix(f" {self.distance_unit_edit.text().strip()}")
+
     def serialize_state(self):
         return {
             "model_path": self.model_edit.text(),
@@ -379,6 +401,7 @@ class GasHoldupWidget(QWidget):
             "calibration_pixels": self.calibration_pixels_spin.value(),
             "calibration_length": self.calibration_length_spin.value(),
             "distance_unit": self.distance_unit_edit.text(),
+            "view_depth": self.view_depth_spin.value(),
             "roi_x": self.roi_x_spin.value(),
             "roi_y": self.roi_y_spin.value(),
             "roi_width": self.roi_width_spin.value(),
@@ -404,6 +427,7 @@ class GasHoldupWidget(QWidget):
             "minimum_bubble_area": self.min_area_spin,
             "calibration_pixels": self.calibration_pixels_spin,
             "calibration_length": self.calibration_length_spin,
+            "view_depth": self.view_depth_spin,
             "roi_x": self.roi_x_spin,
             "roi_y": self.roi_y_spin,
             "roi_width": self.roi_width_spin,
@@ -500,6 +524,7 @@ class GasHoldupWidget(QWidget):
             calibration_pixels=self.calibration_pixels_spin.value(),
             calibration_length=self.calibration_length_spin.value(),
             distance_unit=self.distance_unit_edit.text().strip(),
+            view_depth=self.view_depth_spin.value(),
             roi=ROI(
                 x=self.roi_x_spin.value(),
                 y=self.roi_y_spin.value(),
@@ -512,6 +537,7 @@ class GasHoldupWidget(QWidget):
         )
         config.real_units_per_pixel
         config.normalized_distance_unit
+        config.validated_view_depth
         return config
 
     def start_processing(self):
@@ -569,6 +595,8 @@ class GasHoldupWidget(QWidget):
         self.area_ratio_value.setText(f"{metrics.get('bubble_area_ratio', 0.0):.2f} %")
         self.gas_holdup_value.setText(f"{metrics.get('gas_holdup', 0.0):.2f} %")
         distance_unit = metrics.get("distance_unit", "unit")
+        self.bubble_volume_value.setText(f"{metrics.get('bubble_volume', 0.0):.6g} {distance_unit}³")
+        self.roi_volume_value.setText(f"{metrics.get('roi_volume', 0.0):.6g} {distance_unit}³")
         self.average_diameter_value.setText(
             f"{metrics.get('average_diameter', 0.0):.4f} {distance_unit}"
         )

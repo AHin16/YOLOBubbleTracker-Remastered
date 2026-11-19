@@ -29,6 +29,10 @@ CSV_COLUMNS = (
     "AverageDiameter",
     "DiameterUnit",
     "RealUnitsPerPixel",
+    "ViewDepth",
+    "BubbleVolume",
+    "ROIVolume",
+    "VolumeUnit",
     "ProcessingTime",
 )
 
@@ -50,6 +54,7 @@ class GasHoldupConfig:
     high_quality_segmentation: bool = False
     predict_iou: float = 0.45
     device: str = "auto"
+    view_depth: float = 1.0
 
     @property
     def predict_conf(self):
@@ -71,6 +76,13 @@ class GasHoldupConfig:
         if re.fullmatch(r"[A-Za-zµμ]{1,12}", unit) is None:
             raise ValueError("Distance Unit must contain 1-12 letters, such as mm or µm.")
         return unit
+
+    @property
+    def validated_view_depth(self):
+        depth = float(self.view_depth)
+        if not math.isfinite(depth) or depth <= 0:
+            raise ValueError("Field-of-view Depth must be greater than 0.")
+        return depth
 
 
 def _extract_masks(image_info, frame_shape):
@@ -104,6 +116,7 @@ def render_gas_holdup_overlay(
     result: GasHoldupResult,
     average_diameter,
     distance_unit,
+    view_depth,
 ):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     rendered = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
@@ -130,6 +143,9 @@ def render_gas_holdup_overlay(
     cv2.rectangle(rendered, (x1, y1), (max(x2 - 1, x1), max(y2 - 1, y1)), (255, 255, 255), 1)
     lines = (
         f"Gas Holdup : {result.gas_holdup:.2f} %",
+        f"Bubble Volume : {result.bubble_volume:.6g} {distance_unit}^3",
+        f"ROI Volume : {result.roi_volume:.6g} {distance_unit}^3",
+        f"View Depth : {view_depth:.6g} {distance_unit}",
         f"Bubble Count : {result.bubble_count}",
         f"Bubble Area : {result.bubble_area} px",
         f"Average Diameter : {average_diameter:.4f} {distance_unit}",
@@ -158,6 +174,7 @@ def _csv_row(
     average_diameter,
     distance_unit,
     real_units_per_pixel,
+    view_depth,
     processing_time,
 ):
     return {
@@ -171,6 +188,10 @@ def _csv_row(
         "AverageDiameter": f"{average_diameter:.6f}",
         "DiameterUnit": distance_unit,
         "RealUnitsPerPixel": f"{real_units_per_pixel:.9f}",
+        "ViewDepth": f"{view_depth:.12g}",
+        "BubbleVolume": f"{result.bubble_volume:.12g}",
+        "ROIVolume": f"{result.roi_volume:.12g}",
+        "VolumeUnit": f"{distance_unit}^3",
         "ProcessingTime": f"{processing_time:.6f}",
     }
 
@@ -195,6 +216,7 @@ def run_gas_holdup(
         raise ValueError("Minimum Bubble Area must not be negative.")
     real_units_per_pixel = config.real_units_per_pixel
     distance_unit = config.normalized_distance_unit
+    view_depth = config.validated_view_depth
 
     image_paths = get_image_list(config.input_folder)
     if not image_paths:
@@ -230,6 +252,8 @@ def run_gas_holdup(
                 min_bubble_area=config.min_bubble_area,
                 roi=config.roi,
                 edge_policy=config.edge_policy,
+                real_units_per_pixel=real_units_per_pixel,
+                view_depth=view_depth,
             )
             average_diameter = result.average_diameter * real_units_per_pixel
             overlay = render_gas_holdup_overlay(
@@ -237,6 +261,7 @@ def run_gas_holdup(
                 result,
                 average_diameter,
                 distance_unit,
+                view_depth,
             )
             overlay_name = f"{frame_index + 1:06d}_{osp.splitext(osp.basename(image_path))[0]}.png"
             overlay_path = osp.join(config.output_overlay_folder, overlay_name)
@@ -251,6 +276,7 @@ def run_gas_holdup(
                     average_diameter,
                     distance_unit,
                     real_units_per_pixel,
+                    view_depth,
                     processing_time,
                 )
             )
@@ -274,6 +300,9 @@ def run_gas_holdup(
                             "average_diameter": average_diameter,
                             "distance_unit": distance_unit,
                             "real_units_per_pixel": real_units_per_pixel,
+                            "view_depth": view_depth,
+                            "bubble_volume": result.bubble_volume,
+                            "roi_volume": result.roi_volume,
                             "processing_time": processing_time,
                             "fps": 1.0 / max(processing_time, 1e-9),
                         },

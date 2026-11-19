@@ -203,7 +203,8 @@ class BoTSORT(object):
         self.tracked_stracks = []  # type: list[STrack]
         self.lost_stracks = []  # type: list[STrack]
         self.removed_stracks = []  # type: list[STrack]
-        BaseTrack.clear_count()
+        if getattr(args, "reset_id_counter", True):
+            BaseTrack.clear_count()
 
         self.frame_id = 0
         self.args = args

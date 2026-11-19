@@ -65,6 +65,39 @@ class TrackingContinuityTest(unittest.TestCase):
         render_mask_frame(np.zeros((40, 40, 3), np.uint8), tracks, 0, 0, Args())
         self.assertEqual(draw.call_args.args[2], [1])
         self.assertEqual(draw.call_args.kwargs["speeds"], [None])
+        self.assertEqual(draw.call_args.kwargs["sample_validity"], [False])
+
+    def test_csv_eligibility_controls_style_each_frame(self):
+        analyzer = MotionAnalyzer(SimpleNamespace(min_track_frames=2, frame_interval_seconds=1))
+        with patch("demo_yolo11.plot_tracking") as draw:
+            for frame_id, passes_edge, expected in [(1, True, False), (2, True, True),
+                                                    (3, False, False), (4, True, True)]:
+                record = {"track_id": 1, "center": (20, 50-frame_id), "area_px": 100,
+                          "passes_edge_filter": passes_edge, "tlwh": [10, 20, 20, 20],
+                          "score": .9, "polygon": None}
+                analyzer.update(frame_id, [record])
+                render_mask_frame(np.zeros((80, 80, 3), np.uint8), [record], frame_id, 0, Args())
+                self.assertEqual(draw.call_args.kwargs["sample_validity"], [expected])
+
+    def test_filtered_mask_and_trajectory_are_faint_gray(self):
+        image = np.full((100, 200, 3), 40, np.uint8)
+        rendered = plot_tracking(image, [[10, 10, 50, 40], [110, 10, 50, 40]], [1, 2],
+                                 trajectories=[[(20, 80), (60, 80)], [(120, 80), (160, 80)]],
+                                 sample_validity=[False, True], mode="mask")
+        for point in [(30, 30), (80, 40), (10, 30)]:
+            pixel = rendered[point]
+            self.assertEqual(int(pixel.max()), int(pixel.min()))
+            self.assertGreater(int(pixel.max()), 40)
+            self.assertLess(int(pixel.max()), 85)
+        self.assertGreater(int(np.ptp(rendered[30, 130])), 0)
+        self.assertGreater(int(np.ptp(rendered[80, 140])), 0)
+        np.testing.assert_array_equal(image, np.full_like(image, 40))
+
+    def test_default_rendering_matches_explicit_valid_samples(self):
+        image = np.full((80, 100, 3), 60, np.uint8)
+        default = plot_tracking(image, [[20, 20, 30, 30]], [7])
+        explicit = plot_tracking(image, [[20, 20, 30, 30]], [7], sample_validity=[True])
+        np.testing.assert_array_equal(default, explicit)
 
     @patch("visualization.visualize.cv2.putText")
     def test_unmeasured_speed_is_not_labeled_as_zero(self, put_text):

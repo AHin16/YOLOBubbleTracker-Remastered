@@ -1,4 +1,5 @@
 from copy import copy
+from itertools import count
 
 import numpy as np
 
@@ -7,13 +8,24 @@ from tracker.basetrack import TrackState
 from tracker.bot_sort import BoTSORT, STrack
 
 
+class _BubbleTrack(STrack):
+    def __init__(self, tlwh, score, ids):
+        super().__init__(tlwh, score)
+        self.ids = ids
+
+    def next_id(self):
+        return next(self.ids)
+
+
 class BubbleBoTSORT(BoTSORT):
     """Associate deforming bubbles using observed image motion and box shape."""
 
     def __init__(self, args, frame_rate=30):
         settings = copy(args)
         settings.cmc_method = "none"
+        settings.reset_id_counter = False
         super().__init__(settings, frame_rate)
+        self.ids = count(1)
         self.max_time_lost = max(0, int(getattr(args, "bubble_max_lost_frames", 3)))
         self.buffer_size = self.max_time_lost
 
@@ -37,6 +49,8 @@ class BubbleBoTSORT(BoTSORT):
         track.bubble_observation = observation
         track.bubble_velocity = velocity
         track.bubble_frame = self.frame_id
+        track.bubble_detection_index = detection.bubble_detection_index
+        track.bubble_ambiguous_match = getattr(detection, "bubble_ambiguous_match", False)
         track.mean[:4] = observation
         track.mean[4:6] = velocity if velocity is not None else 0
         track.mean[6:] = 0
@@ -83,6 +97,12 @@ class BubbleBoTSORT(BoTSORT):
         for track_index, detection_index in pairs:
             track = tracks[track_index]
             detection = detections[detection_index]
+            margin = getattr(self.args, "bubble_ambiguity_margin", 0)
+            if margin > 0:
+                alternatives = np.concatenate((np.delete(costs[track_index], detection_index),
+                                               np.delete(costs[:, detection_index], track_index)))
+                detection.bubble_ambiguous_match = bool(np.any(
+                    alternatives <= min(costs[track_index, detection_index] + margin, threshold)))
             if track.state == TrackState.Lost:
                 track.re_activate(detection, self.frame_id, new_id=False)
             else:
@@ -96,11 +116,12 @@ class BubbleBoTSORT(BoTSORT):
         self.frame_shape = img.shape[:2]
         values = np.asarray(output_results, dtype=np.float32)
         high, low = [], []
-        for detection in values:
+        for detection_index, detection in enumerate(values):
             score = float(detection[4] if len(detection) == 5 else detection[4] * detection[5])
             if score <= self.track_low_thresh:
                 continue
-            candidate = STrack(STrack.tlbr_to_tlwh(detection[:4]), score)
+            candidate = _BubbleTrack(STrack.tlbr_to_tlwh(detection[:4]), score, self.ids)
+            candidate.bubble_detection_index = detection_index
             (high if score >= self.track_high_thresh else low).append(candidate)
 
         unconfirmed = [track for track in self.tracked_stracks if not track.is_activated]

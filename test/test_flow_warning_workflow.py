@@ -93,6 +93,38 @@ class FlowWarningWorkflowTest(unittest.TestCase):
             self.assertEqual(len(windows), 1)
             self.assertEqual(windows[0]["state"], "insufficient")
 
+    def test_workflow_reconnects_missed_frame_and_uses_detection_confidence(self):
+        class ConfidencePredictor:
+            task = "segment"
+
+            def predict(self, image):
+                index = int(image[0, 0, 0])
+                if index == 2:
+                    return None, {"mask_arrays": []}
+                top = 30 - index
+                masks = []
+                for left in (10, 40):
+                    mask = np.zeros(image.shape[:2], dtype=np.uint8)
+                    mask[top:top+12, left:left+12] = 1
+                    masks.append(mask)
+                confidence = .2 if index == 3 else .95
+                return np.array([[10, top, 22, top+12, confidence, 0],
+                                 [40, top, 52, top+12, .2, 0]], np.float32), {"mask_arrays": masks}
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = self.setup_inputs(Path(temp_dir))
+            summary = run_flow_warning(config, predictor_factory=lambda _config: ConfidencePredictor())
+            with (Path(summary["output_dir"]) / "tracks.csv").open(encoding="utf-8-sig", newline="") as handle:
+                tracks = [row for row in csv.DictReader(handle) if row["phase"] == "analysis"]
+            first = next(row for row in tracks if row["frame"] == "1" and float(row["x"]) < 30)
+            restored = next(row for row in tracks if row["frame"] == "4" and float(row["x"]) < 30)
+            low_only = [row for row in tracks if float(row["x"]) > 30]
+            self.assertEqual(restored["track_id"], first["track_id"])
+            self.assertAlmostEqual(float(restored["rise_velocity"]), .1)
+            self.assertTrue(all(row["track_id"] == "" for row in low_only))
+            self.assertTrue(all(row["diameter"] != "" for row in low_only))
+            self.assertTrue(all(row["rise_velocity"] == "" for row in low_only))
+
     def test_missing_masks_do_not_become_empty_frames(self):
         class MissingMaskPredictor:
             task = "segment"

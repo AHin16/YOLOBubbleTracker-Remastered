@@ -117,6 +117,7 @@ def plot_tracking(
     show_speed_text=False,
     speed_unit="unit",
     mode="mask",
+    sample_validity=None,
 ):
     if mode == "box":
         im = np.ascontiguousarray(np.copy(image))
@@ -154,17 +155,48 @@ def plot_tracking(
             )
         return im
 
-    im = np.ascontiguousarray(np.copy(image)).astype(np.float32)
-    outline = np.zeros_like(image, dtype=np.uint8)
     mask_polygons = mask_polygons or []
     trajectories = trajectories or []
     centers = centers or []
     speeds = speeds or []
+    sample_validity = [True] * len(tlwhs) if sample_validity is None else sample_validity
+    filtered_indices = [index for index in range(len(tlwhs))
+                        if index < len(sample_validity) and not sample_validity[index]]
     fill_alpha = 0.18
     outline_thickness = max(2, int(round(min(image.shape[:2]) / 320.0)))
     trajectory_thickness = max(2, outline_thickness)
+    background = np.ascontiguousarray(np.copy(image))
+    if filtered_indices:
+        muted = background.copy()
+        gray = (160, 160, 160)
+        for index in filtered_indices:
+            polygon = mask_polygons[index] if index < len(mask_polygons) else None
+            bubble_mask = np.zeros(image.shape[:2], dtype=np.uint8)
+            _draw_bubble_shape(bubble_mask, tlwhs[index], polygon=polygon)
+            mask = bubble_mask > 0
+            muted[mask] = muted[mask] * .76 + np.asarray(gray) * .24
+            _draw_bubble_shape(muted, tlwhs[index], polygon=polygon, color=gray,
+                               thickness=outline_thickness)
+            trajectory = trajectories[index] if index < len(trajectories) else None
+            if trajectory is not None and len(trajectory) >= 2:
+                points = np.round(np.asarray(trajectory, dtype=np.float32)).astype(np.int32).reshape(-1, 1, 2)
+                cv2.polylines(muted, [points], False, gray, trajectory_thickness, cv2.LINE_AA)
+            center = centers[index] if index < len(centers) else None
+            if center is not None:
+                center_point = tuple(int(round(value)) for value in center)
+                cv2.circle(muted, center_point, max(trajectory_thickness, 2), gray, -1, cv2.LINE_AA)
+                if show_speed_text:
+                    obj_id = int(obj_ids[index]) if index < len(obj_ids) else index + 1
+                    cv2.putText(muted, f"ID {obj_id}",
+                                (center_point[0] + 8, max(center_point[1] - 8, 18)),
+                                cv2.FONT_HERSHEY_SIMPLEX, .5, gray, 1, cv2.LINE_AA)
+        background = cv2.addWeighted(background, .75, muted, .25, 0)
+    im = background.astype(np.float32)
+    outline = np.zeros_like(image, dtype=np.uint8)
 
     for i, tlwh in enumerate(tlwhs):
+        if i < len(sample_validity) and not sample_validity[i]:
+            continue
         obj_id = int(obj_ids[i]) if i < len(obj_ids) else i + 1
         color = np.array(_get_track_color(obj_id), dtype=np.float32)
         polygon = mask_polygons[i] if i < len(mask_polygons) else None
@@ -189,6 +221,8 @@ def plot_tracking(
     result[outline_mask] = outline[outline_mask]
 
     for i, _ in enumerate(tlwhs):
+        if i < len(sample_validity) and not sample_validity[i]:
+            continue
         obj_id = int(obj_ids[i]) if i < len(obj_ids) else i + 1
         color = _get_track_color(obj_id)
         trajectory = trajectories[i] if i < len(trajectories) else None

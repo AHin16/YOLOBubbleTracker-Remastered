@@ -74,6 +74,30 @@ class BubbleMatchingTest(unittest.TestCase):
         changed = tracker.update(np.array([[0, 0, 500, 500, .95, 0]], np.float32), frame)
         self.assertTrue(all(track.track_id != first_id for track in changed))
 
+    def test_detection_indices_follow_reordered_high_and_low_score_observations(self):
+        tracker = self.tracker()
+        frame = np.zeros((200, 200, 3), np.uint8)
+        first = tracker.update(np.array([
+            [20, 20, 40, 40, .95, 0], [100, 100, 120, 120, .95, 0],
+        ], np.float32), frame)
+        ids = {target.bubble_detection_index: target.track_id for target in first}
+        second = tracker.update(np.array([
+            [100, 98, 120, 118, .2, 0], [20, 18, 40, 38, .95, 0],
+        ], np.float32), frame)
+        self.assertEqual({target.bubble_detection_index: target.track_id for target in second},
+                         {0: ids[1], 1: ids[0]})
+
+    def test_tracker_instances_allocate_ids_independently(self):
+        tracker = self.tracker()
+        frame = np.zeros((200, 200, 3), np.uint8)
+        detection = np.array([[20, 20, 40, 40, .95, 0]], np.float32)
+        initial_id = tracker.update(detection, frame)[0].track_id
+        self.tracker().update(detection, frame)
+        self.tracker()
+        targets = tracker.update(np.vstack((detection, [100, 100, 120, 120, .95, 0])), frame)
+        self.assertEqual(len({target.track_id for target in targets}), 2)
+        self.assertEqual(targets[0].track_id, initial_id)
+
 
 if __name__ == "__main__":
     unittest.main()

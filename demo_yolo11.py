@@ -658,6 +658,7 @@ def render_mask_frame(raw_img, frame_tracks, frame_id, fps, args):
         show_speed_text=getattr(args, "show_speed_text", False),
         speed_unit=getattr(args, "distance_unit", "unit"),
         mode="mask",
+        sample_validity=[track.get("is_csv_sample", False) for track in visible_tracks],
     )
 
 

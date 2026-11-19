@@ -11,10 +11,13 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import delete
 
+from ui_home import HomePage
+
 
 ROOT = Path(__file__).resolve().parent
 ACCENT = "#bd2030"
 ICON_PATHS = {
+    "home": '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
     "bubbles": '<circle cx="8" cy="9" r="4"/><circle cx="17" cy="16" r="5"/><circle cx="18" cy="5" r="2"/><circle cx="5" cy="19" r="2"/>',
     "tracking": '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="9" cy="9" r="2"/><path d="m5 18 5-5 3 3 3-4 3 3"/>',
     "holdup": '<path d="M5 3h14M8 3v7l-4 8a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-4-8V3M7 14h10"/><circle cx="11" cy="17" r="1"/>',
@@ -306,6 +309,7 @@ def _polish_analysis_page(page, gas=False):
     page.preview_label.setWordWrap(True)
     page.preview_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
     if gas:
+        page.setObjectName("gasHoldupPage")
         # A two-by-two ROI grid fits the same width as the other form fields.
         roi_grid = page.roi_x_spin.parentWidget().layout()
         roi_pairs = [(roi_grid.itemAtPosition(0, col).widget(),
@@ -327,16 +331,15 @@ def _polish_analysis_page(page, gas=False):
         for label in page.reason_labels.values():
             label.setProperty("role", "muted")
             label.parentWidget().setMinimumHeight(190)
-        # Evidence remains reachable on shorter displays without compressing plots.
-        splitter = page.findChild(QSplitter)
-        right = splitter.widget(1)
-        right.setParent(None)
-        right_scroll = _scroll(right)
-        right_scroll.setMinimumWidth(360)
-        splitter.addWidget(right_scroll)
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([350, 780])
+    splitter = page.findChild(QSplitter)
+    right = splitter.widget(1)
+    right.setParent(None)
+    right_scroll = _scroll(right)
+    right_scroll.setMinimumWidth(360)
+    splitter.addWidget(right_scroll)
+    splitter.setStretchFactor(0, 0)
+    splitter.setStretchFactor(1, 1)
+    splitter.setSizes([350, 780])
     _analysis_run_panel(page, gas)
 
 
@@ -357,7 +360,7 @@ class ResearchWorkspace(QWidget):
 
         sidebar = QFrame()
         sidebar.setObjectName("workspaceSidebar")
-        sidebar.setFixedWidth(202)
+        sidebar.setFixedWidth(224)
         side = QVBoxLayout(sidebar)
         side.setContentsMargins(18, 30, 18, 22)
         side.setSpacing(10)
@@ -376,11 +379,11 @@ class ResearchWorkspace(QWidget):
         side.addWidget(_label("RESEARCH WORKSPACE", "sectionCaption"))
         side.addSpacing(6)
         self.nav_group = QButtonGroup(self)
-        self.nav_buttons = []
-        for index, (name, graphic) in enumerate((
-            ("Bubble Tracking", "tracking"), ("Gas Holdup", "holdup"),
-            ("Flow State Warning", "warning"),
-        )):
+        self.nav_buttons = {}
+        for index, name, graphic in (
+            (3, "Home", "home"), (0, "Bubble Tracking", "tracking"),
+            (1, "Gas Holdup", "holdup"), (2, "Flow State Warning", "warning"),
+        ):
             button = QPushButton(name)
             button.setProperty("role", "navigation")
             button.setCheckable(True)
@@ -389,7 +392,7 @@ class ResearchWorkspace(QWidget):
             button.setCursor(Qt.PointingHandCursor)
             self.language.set_text(button, name)
             self.nav_group.addButton(button, index)
-            self.nav_buttons.append(button)
+            self.nav_buttons[index] = button
             side.addWidget(button)
         self.nav_group.idClicked.connect(self.tabs.setCurrentIndex)
         side.addStretch()
@@ -451,17 +454,18 @@ class ResearchWorkspace(QWidget):
 
     def _refresh(self, *_args):
         index = max(self.tabs.currentIndex(), 0)
-        titles = ("Bubble Tracking", "Gas Holdup", "Flow State Warning")
+        titles = ("Bubble Tracking", "Gas Holdup", "Flow State Warning", "Home")
         subtitles = (
             "Detect bubbles, follow trajectories, and measure experimental motion.",
-            "Measure bubble area fraction and size from segmentation masks.",
+            "Estimate spherical bubble volume fraction with calibrated scale and view depth.",
             "Compare against a normal baseline and review sustained changes.",
+            "One workspace for bubble motion, gas holdup, and flow-state changes.",
         )
         self.language.set_text(self.title, titles[index])
         self.language.set_text(self.subtitle, subtitles[index])
-        self.page_number.setText(f"0{index + 1} / 03")
+        self.page_number.setText(self.language.text("Overview") if index == 3 else f"0{index + 1} / 03")
         self.nav_buttons[index].setChecked(True)
-        for number, graphic in enumerate(("tracking", "holdup", "warning")):
+        for number, graphic in enumerate(("tracking", "holdup", "warning", "home")):
             self.nav_buttons[number].setIcon(icon(graphic, ACCENT if number == index else "#937d85", 21))
 
 
@@ -474,6 +478,10 @@ def install_workspace(controller, tracking_page, language_panel):
     _tracking_layout(controller, tracking_page)
     _polish_analysis_page(controller.gas_holdup_widget, gas=True)
     _polish_analysis_page(controller.flow_warning_widget)
+    controller.home_page = HomePage(controller.language, {
+        name: icon(name, ACCENT, 28) for name in ("tracking", "holdup", "warning")})
+    controller.home_page.workflow_requested.connect(controller.workflow_tabs.setCurrentIndex)
+    controller.workflow_tabs.addTab(controller.home_page, "Home")
     window.takeCentralWidget()
     shell = ResearchWorkspace(controller, tracking_page, language_panel)
     window.setCentralWidget(shell)

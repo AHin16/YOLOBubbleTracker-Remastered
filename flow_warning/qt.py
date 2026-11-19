@@ -225,7 +225,7 @@ class FlowWarningWidget(QWidget):
         self._number(form, "recovery_windows", "恢复持续窗口数", 2, 1, 100)
         self._number(form, "threshold", "偏离尺度倍数", 3, 0.5, 20, 1)
         self._number(form, "min_area", "最小掩膜面积 (px²)", 10, 1, 100000)
-        self._number(form, "max_distance", "相邻帧最大关联距离 (px)", 40, 1, 10000, 1)
+        self._number(form, "max_distance", "速度采样最大位移 (px/帧)", 40, 1, 10000, 1)
         self._number(form, "predict_conf", "分割置信度", 0.1, 0.001, 1, 3)
         device = QComboBox()
         device.addItems(["auto", "cpu", "cuda:0"])

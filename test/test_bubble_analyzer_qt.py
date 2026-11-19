@@ -35,7 +35,7 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
                 controller = bubble_tracker_ui_qt.BubbleTrackerQt()
 
             tabs = controller.workflow_tabs
-            self.assertEqual(tabs.count(), 3)
+            self.assertEqual(tabs.count(), 4)
             self.assertEqual(tabs.tabText(0), "气泡跟踪")
             self.assertEqual(tabs.tabText(1), "气含率")
             self.assertIsNotNone(tabs.widget(0).findChild(QPushButton, "startBtn"))
@@ -107,6 +107,7 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
             controller.gas_holdup_widget.calibration_pixels_spin.setValue(100.0)
             controller.gas_holdup_widget.calibration_length_spin.setValue(1.0)
             controller.gas_holdup_widget.distance_unit_edit.setText("mm")
+            controller.gas_holdup_widget.view_depth_spin.setValue(2.5)
             controller.gas_holdup_widget.high_quality_check.setChecked(True)
             controller.gas_holdup_widget.input_width_spin.setValue(1280)
             controller.gas_holdup_widget.input_height_spin.setValue(720)
@@ -117,6 +118,9 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
             self.assertEqual(state["gas_holdup"]["calibration_pixels"], 100.0)
             self.assertEqual(state["gas_holdup"]["calibration_length"], 1.0)
             self.assertEqual(state["gas_holdup"]["distance_unit"], "mm")
+            self.assertEqual(state["gas_holdup"]["view_depth"], 2.5)
+            with open(bubble_tracker_ui_qt.UI_STATE_PATH, encoding="utf-8") as state_file:
+                self.assertEqual(json.load(state_file)["gas_holdup"]["view_depth"], 2.5)
             self.assertTrue(state["gas_holdup"]["high_quality_segmentation"])
             self.assertEqual(state["gas_holdup"]["input_width"], 1280)
             self.assertEqual(state["gas_holdup"]["input_height"], 720)
@@ -139,6 +143,7 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
             widget.high_quality_check.setChecked(True)
             widget.input_width_spin.setValue(1280)
             widget.input_height_spin.setValue(720)
+            widget.view_depth_spin.setValue(0.75)
 
             model_path = os.path.join(temp_dir, "model.pt")
             input_dir = os.path.join(temp_dir, "input")
@@ -154,6 +159,7 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
             self.assertTrue(widget.input_height_spin.isEnabled())
             self.assertTrue(config.high_quality_segmentation)
             self.assertEqual(config.input_size, (720, 1280))
+            self.assertEqual(config.view_depth, 0.75)
             controller.window.close()
 
     def test_displays_actual_and_pixel_diameter_results(self):
@@ -173,11 +179,19 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
                         "average_diameter": 0.1234,
                         "average_diameter_px": 12.34,
                         "distance_unit": "mm",
+                        "bubble_volume": 0.00123,
+                        "roi_volume": 0.05,
+                        "gas_holdup": 2.46,
+                        "bubble_area_ratio": 21.0,
                     },
                 }
             )
             self.assertEqual(controller.gas_holdup_widget.average_diameter_value.text(), "0.1234 mm")
             self.assertEqual(controller.gas_holdup_widget.average_diameter_px_value.text(), "12.34 px")
+            self.assertEqual(controller.gas_holdup_widget.bubble_volume_value.text(), "0.00123 mm³")
+            self.assertEqual(controller.gas_holdup_widget.roi_volume_value.text(), "0.05 mm³")
+            self.assertEqual(controller.gas_holdup_widget.gas_holdup_value.text(), "2.46 %")
+            self.assertEqual(controller.gas_holdup_widget.area_ratio_value.text(), "21.00 %")
             controller.window.close()
 
     def test_restores_gas_holdup_state_without_changing_tracking_keys(self):
@@ -200,6 +214,7 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
                     "calibration_pixels": 200.0,
                     "calibration_length": 2.0,
                     "distance_unit": "mm",
+                    "view_depth": 3.25,
                     "high_quality_segmentation": True,
                     "input_width": 1024,
                     "input_height": 768,
@@ -214,6 +229,7 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
             self.assertEqual(gas_state["calibration_pixels"], 200.0)
             self.assertEqual(gas_state["calibration_length"], 2.0)
             self.assertEqual(gas_state["distance_unit"], "mm")
+            self.assertEqual(gas_state["view_depth"], 3.25)
             self.assertTrue(gas_state["high_quality_segmentation"])
             self.assertEqual(gas_state["input_width"], 1024)
             self.assertEqual(gas_state["input_height"], 768)
@@ -239,6 +255,7 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
             self.assertEqual(gas_state["model_path"], "C:/models/bubbles.pt")
             self.assertTrue(gas_state["output_overlay_folder"].startswith("C:/results"))
             self.assertTrue(gas_state["output_csv"].startswith("C:/results"))
+            self.assertEqual(gas_state["view_depth"], 1.0)
             controller.window.close()
 
 

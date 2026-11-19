@@ -56,6 +56,18 @@ class GasHoldupWorkflowTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Distance Unit"):
             GasHoldupConfig(**base_config, distance_unit="=1+1").normalized_distance_unit
 
+    def test_rejects_invalid_depth_before_loading_images_or_predictor(self):
+        for depth in (0, -1, math.nan, math.inf):
+            with self.subTest(depth=depth), tempfile.TemporaryDirectory() as temp_dir:
+                config = GasHoldupConfig(
+                    model_path="unused.pt", input_folder=str(Path(temp_dir) / "missing"),
+                    output_overlay_folder=str(Path(temp_dir) / "overlay"),
+                    output_csv=str(Path(temp_dir) / "results.csv"), view_depth=depth,
+                )
+                with self.assertRaisesRegex(ValueError, "Depth"):
+                    run_gas_holdup(config)
+                self.assertFalse(Path(config.output_overlay_folder).exists())
+
     def test_rejects_overlay_folder_inside_input_folder(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             input_dir = Path(temp_dir) / "input"
@@ -95,6 +107,7 @@ class GasHoldupWorkflowTest(unittest.TestCase):
                 calibration_pixels=100.0,
                 calibration_length=1.0,
                 distance_unit="mm",
+                view_depth=2.5,
             )
 
             summary = run_gas_holdup(
@@ -122,6 +135,10 @@ class GasHoldupWorkflowTest(unittest.TestCase):
                 "AverageDiameter",
                 "DiameterUnit",
                 "RealUnitsPerPixel",
+                "ViewDepth",
+                "BubbleVolume",
+                "ROIVolume",
+                "VolumeUnit",
                 "ProcessingTime",
             ],
         )
@@ -129,7 +146,15 @@ class GasHoldupWorkflowTest(unittest.TestCase):
         self.assertEqual(rows[0]["BubbleCount"], "2")
         self.assertEqual(rows[0]["BubbleArea"], "21")
         self.assertEqual(rows[0]["ROIArea"], "100")
-        self.assertAlmostEqual(float(rows[0]["GasHoldup"]), 21.0)
+        expected_volume = 4.0 * (9.0 ** 1.5 + 12.0 ** 1.5) / (3.0 * math.sqrt(math.pi)) * 0.01 ** 3
+        expected_roi_volume = 100 * 0.01 ** 2 * 2.5
+        expected_holdup = 100 * expected_volume / expected_roi_volume
+        self.assertAlmostEqual(float(rows[0]["BubbleAreaRatio"]), 21.0)
+        self.assertAlmostEqual(float(rows[0]["GasHoldup"]), expected_holdup, places=5)
+        self.assertAlmostEqual(float(rows[0]["BubbleVolume"]), expected_volume)
+        self.assertAlmostEqual(float(rows[0]["ROIVolume"]), expected_roi_volume)
+        self.assertAlmostEqual(float(rows[0]["ViewDepth"]), 2.5)
+        self.assertEqual(rows[0]["VolumeUnit"], "mm^3")
         expected_diameter_px = (
             2.0 * math.sqrt(9.0 / math.pi) + 2.0 * math.sqrt(12.0 / math.pi)
         ) / 2.0
@@ -142,6 +167,10 @@ class GasHoldupWorkflowTest(unittest.TestCase):
         self.assertAlmostEqual(progress[0]["metrics"]["average_diameter_px"], expected_diameter_px)
         self.assertAlmostEqual(progress[0]["metrics"]["average_diameter"], expected_diameter_px * 0.01)
         self.assertEqual(progress[0]["metrics"]["distance_unit"], "mm")
+        self.assertAlmostEqual(progress[0]["metrics"]["gas_holdup"], expected_holdup)
+        self.assertAlmostEqual(progress[0]["metrics"]["bubble_volume"], expected_volume)
+        self.assertAlmostEqual(progress[0]["metrics"]["roi_volume"], expected_roi_volume)
+        self.assertAlmostEqual(progress[0]["metrics"]["view_depth"], 2.5)
         self.assertEqual(progress[-1]["frame_id"], 2)
         self.assertFalse(summary["stopped"])
         self.assertEqual(summary["processed_frames"], 2)

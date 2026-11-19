@@ -27,9 +27,43 @@ class GasHoldupAnalysisTest(unittest.TestCase):
         self.assertEqual(result.bubble_area, 28)
         self.assertEqual(result.roi_area, 100)
         self.assertAlmostEqual(result.bubble_area_ratio, 28.0)
-        self.assertAlmostEqual(result.gas_holdup, 28.0)
         expected_diameter = 2.0 * math.sqrt(16.0 / math.pi)
         self.assertAlmostEqual(result.average_diameter, expected_diameter)
+        expected_volume = 2.0 * math.pi * expected_diameter ** 3 / 6.0
+        self.assertAlmostEqual(result.gas_holdup, expected_volume)
+
+    def test_sums_individual_spheres_with_calibration_and_view_depth(self):
+        small = np.zeros((10, 10), dtype=np.uint8)
+        large = np.zeros((10, 10), dtype=np.uint8)
+        small[1:3, 1:3] = 1
+        large[2:6, 2:6] = 1
+        # With this calibration, areas 4 and 16 give actual diameters 2 and 4.
+        scale = math.sqrt(math.pi) / 2.0
+        for scale_factor, depth, expected_percent in ((1, 3, 16), (1, 6, 8), (2, 3, 32)):
+            with self.subTest(scale_factor=scale_factor, depth=depth):
+                result = analyze_masks(
+                    [small, large], (10, 10), min_bubble_area=1,
+                    real_units_per_pixel=scale * scale_factor, view_depth=depth,
+                )
+                self.assertEqual(result.bubble_area, 19)
+                self.assertAlmostEqual(result.bubble_area_ratio, 19.0)
+                self.assertAlmostEqual(result.bubble_volume, 12 * math.pi * scale_factor ** 3)
+                self.assertAlmostEqual(result.roi_volume, 25 * math.pi * scale_factor ** 2 * depth)
+                self.assertAlmostEqual(result.gas_holdup, expected_percent)
+
+    def test_empty_frame_has_zero_bubble_volume_and_holdup(self):
+        result = analyze_masks([], (10, 20), real_units_per_pixel=0.1, view_depth=2)
+        self.assertEqual(result.bubble_count, 0)
+        self.assertEqual(result.bubble_volume, 0.0)
+        self.assertAlmostEqual(result.roi_volume, 4.0)
+        self.assertEqual(result.gas_holdup, 0.0)
+
+    def test_rejects_nonpositive_and_nonfinite_volume_parameters(self):
+        for parameter in ("real_units_per_pixel", "view_depth"):
+            for value in (0, -1, math.nan, math.inf):
+                with self.subTest(parameter=parameter, value=value):
+                    with self.assertRaises(ValueError):
+                        analyze_masks([], (10, 10), **{parameter: value})
 
     def test_applies_minimum_area_without_removing_valid_small_bubbles(self):
         noise = np.zeros((8, 8), dtype=np.uint8)
@@ -62,7 +96,9 @@ class GasHoldupAnalysisTest(unittest.TestCase):
         self.assertEqual(result.bubble_count, 1)
         self.assertEqual(result.bubble_area, 9)
         self.assertEqual(result.roi_area, 25)
-        self.assertAlmostEqual(result.gas_holdup, 36.0)
+        self.assertAlmostEqual(result.bubble_area_ratio, 36.0)
+        self.assertAlmostEqual(result.roi_volume, 25.0)
+        self.assertAlmostEqual(result.gas_holdup, 100.0 * 36.0 / math.sqrt(math.pi) / 25.0)
 
     def test_exclude_ignores_masks_touching_the_image_border(self):
         edge_bubble = np.zeros((10, 10), dtype=np.uint8)
@@ -93,7 +129,9 @@ class GasHoldupAnalysisTest(unittest.TestCase):
 
         self.assertEqual(result.bubble_count, 1)
         self.assertEqual(result.bubble_area, 6)
-        self.assertAlmostEqual(result.gas_holdup, 100.0 * 6.0 / 36.0)
+        self.assertAlmostEqual(result.bubble_area_ratio, 100.0 * 6.0 / 36.0)
+        volume = 4.0 * 6.0 ** 1.5 / (3.0 * math.sqrt(math.pi))
+        self.assertAlmostEqual(result.gas_holdup, 100.0 * volume / 36.0)
 
     def test_rejects_masks_with_unexpected_dimensions(self):
         bad_mask = np.zeros((5, 5), dtype=np.uint8)

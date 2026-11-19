@@ -31,7 +31,7 @@ class FlowWarningQtTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             controller = self.controller(Path(temp_dir))
             tabs = controller.workflow_tabs
-            self.assertEqual(tabs.count(), 3)
+            self.assertEqual(tabs.count(), 4)
             self.assertEqual(tabs.tabText(2), "流态安全预警")
             widget = controller.flow_warning_widget
             tracking_before = controller.window.fpsSpin.value()
