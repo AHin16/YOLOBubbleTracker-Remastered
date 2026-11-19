@@ -66,14 +66,14 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
         controller._set_running(False)
         self.assertEqual(controller.window.avgSpeedValue.text(), "6.00 mm/s")
         self.assertEqual(controller.window.maxSpeedValue.text(), "8.00 mm/s")
-        self.assertEqual(controller.window.avgAreaValue.text(), "150.00 px^2")
+        self.assertEqual(controller.window.avgAreaValue.text(), "150.00 px²")
 
         controller.window.distanceUnitEdit.setText("cm")
         controller._set_running(True)
 
         self.assertEqual(controller.window.avgSpeedValue.text(), "0.00 cm/s")
         self.assertEqual(controller.window.maxSpeedValue.text(), "0.00 cm/s")
-        self.assertEqual(controller.window.avgAreaValue.text(), "0.00 px^2")
+        self.assertEqual(controller.window.avgAreaValue.text(), "0.00 px²")
 
     def test_tracking_completion_displays_final_statistics_after_preview(self):
         with patch.object(QMainWindow, "show"):
@@ -93,7 +93,7 @@ class BubbleAnalyzerQtTest(unittest.TestCase):
 
         self.assertEqual(controller.window.avgSpeedValue.text(), "4.67 mm/s")
         self.assertEqual(controller.window.maxSpeedValue.text(), "8.00 mm/s")
-        self.assertEqual(controller.window.avgAreaValue.text(), "300.00 px^2")
+        self.assertEqual(controller.window.avgAreaValue.text(), "300.00 px²")
 
     def test_serializes_gas_holdup_settings_in_a_namespace(self):
         with tempfile.TemporaryDirectory() as temp_dir:

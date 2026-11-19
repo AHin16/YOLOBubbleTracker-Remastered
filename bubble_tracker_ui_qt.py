@@ -572,7 +572,7 @@ class BubbleTrackerQt(QObject):
         distance_unit = metrics.get("distance_unit", "unit")
         self.window.avgSpeedValue.setText(f"{metrics.get('avg_speed', 0.0):.2f} {distance_unit}/s")
         self.window.maxSpeedValue.setText(f"{metrics.get('max_speed', 0.0):.2f} {distance_unit}/s")
-        self.window.avgAreaValue.setText(f"{metrics.get('avg_area_px', 0.0):.2f} px^2")
+        self.window.avgAreaValue.setText(f"{metrics.get('avg_area_px', 0.0):.2f} px²")
 
     def _handle_progress(self, payload):
         metrics = payload.get("metrics", {})
