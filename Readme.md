@@ -20,15 +20,15 @@
 
 ### 1. 准备 Python 环境
 
-下载或克隆本仓库后，在项目根目录运行。推荐使用 Conda 和 Python 3.10；当前本地开发环境名为 `BIFBAgent`。
+下载或克隆本仓库后，在项目根目录运行。推荐使用 Conda 和 Python 3.10；。
 
 ```powershell
-conda create -n BIFBAgent python=3.10 -y
-conda activate BIFBAgent
+conda create -n 你的环境名 python=3.10 -y
+conda activate 你的环境名
 python -m pip install -r requirements.txt
 ```
 
-已有 `BIFBAgent` 环境时，跳过创建步骤。主要依赖包括 PyTorch、Ultralytics、OpenCV、NumPy、SciPy、PySide6、`lap` 和 `cython-bbox`，完整列表见 [requirements.txt](requirements.txt)。
+主要依赖包括 PyTorch、Ultralytics、OpenCV、NumPy、SciPy、PySide6、`lap` 和 `cython-bbox`，完整列表见 [requirements.txt](requirements.txt)。
 
 入口在加载 Qt 前初始化 `typing_extensions`，以兼容 Python 3.10 中 PySide6 与 PyTorch 的 `Self` 类型导入顺序。
 
@@ -43,10 +43,8 @@ Bubble Tracking 的 Device 可选择 `auto`、`cpu` 或 `cuda:0`；Gas Holdup �
 ### 2. 准备模型和输入数据
 
 - **模型权重不随 Git 仓库分发。** 请自行准备与本项目兼容、针对气泡训练的 YOLO 实例分割权重。
-- 默认模型路径为项目根目录的 `3900.pt`，也可在界面的 **Model** 中选择其他路径。
 - 模型选择框支持 `.pt` 和 `.onnx`；ONNX 需要兼容的导出模型及相应运行时，建议先用 `.pt` 跑通。
 - Gas Holdup 必须使用实例分割模型。普通目标检测模型只有检测框，不能用于该流程的掩膜面积计算。
-- `weights/yolo11n.pt` 等通用检测权重不能替代经过气泡训练的分割模型。
 
 仓库保留 `data/dataset/test_images/` 下的三张 TIFF 图片，可用于分割与 Gas Holdup 试运行。视频放在本地 `data/videos/` 或仓库外，再从界面选择。
 
@@ -55,7 +53,7 @@ Bubble Tracking 的 Device 可选择 `auto`、`cpu` 或 `cuda:0`；Gas Holdup �
 ### 3. 启动界面
 
 ```powershell
-conda run --no-capture-output -n BIFBAgent python main.py
+conda run --no-capture-output -n 你的环境名 python main.py
 ```
 
 已激活环境时也可直接执行：
@@ -64,11 +62,11 @@ conda run --no-capture-output -n BIFBAgent python main.py
 python main.py
 ```
 
-Windows 可双击 `START.bat` 启动。脚本优先使用本机 `E:\Anaconda3\condabin\conda.bat`，不存在时使用 PATH 中的 `conda`，激活 `BIFBAgent` 环境后运行 `main.py`。
+Windows 可双击 `START.bat` 启动。脚本优先使用本机 `Anaconda3\condabin\conda.bat`，不存在时使用 PATH 中的 `conda`，激活环境后运行 `main.py`。
 
 ### 4. 研究工作台界面
 
-界面沿用 BIFBAgent 的暖白底色、酒红强调色、浅色侧栏与圆角卡片。启动默认进入首页；首页提供三个分析入口，左侧导航可切换首页、气泡跟踪、气含率和流态安全预警；顶部显示当前工作流及语言切换。
+启动默认进入首页；首页提供三个分析入口，左侧导航可切换首页、气泡跟踪、气含率和流态安全预警；顶部显示当前工作流及语言切换。
 
 - **气泡跟踪**：左侧分为文件、参数和日志，右侧展示统计卡片、预览、进度和处理性能。
 - **气含率**：配置面板可滚动，结果集中显示为统计卡片；开始、停止与进度固定在页面底部。
@@ -76,7 +74,6 @@ Windows 可双击 `START.bat` 启动。脚本优先使用本机 `E:\Anaconda3\co
 
 ![气泡跟踪工作台](docs/images/ui-tracking.png)
 
-界面定义仍使用 `bubble_tracker_ui.ui`；`ui_theme.py` 在运行时组织工作台布局，`ui_theme.qss` 维护配色与组件样式，`ui_assets/` 提供轻量 SVG 图标。检测、跟踪与统计仍使用各工作流的原有实现。
 
 ### 5. 切换界面语言 / Interface Language
 
@@ -256,17 +253,17 @@ HkcTracker/
 ├── weights/                   # 本地模型目录，权重不纳入 Git
 ├── ui_formatters.py           # 性能指标显示格式
 ├── requirements.txt           # 当前桌面流程的依赖
-└── START.bat                   # BIFBAgent 环境启动脚本
+└── START.bat                  # 启动脚本
 ```
 
-`tracking/bot_sort.py` 直接引用 `BoT-SORT/`，发布时需保留该源码目录及第三方许可证。`bubble_tracker_ui.py` 是旧版界面，`main.py` 当前使用 Qt 版本。历史 YOLOv5 和 `test/demo/` 脚本保留供参考，部分包含原开发机的绝对路径。
+`tracking/bot_sort.py` 直接引用 `BoT-SORT/`。`bubble_tracker_ui.py` 是旧版界面，`main.py` 当前使用 Qt 版本。
 
 ## 测试与脚本运行
 
 在项目根目录使用已安装依赖的环境执行：
 
 ```powershell
-conda run --no-capture-output -n BIFBAgent python -m unittest discover -s test -p "test_*.py"
+conda run --no-capture-output -n 你的环境名 python -m unittest discover -s test -p "test_*.py"
 ```
 
 测试覆盖 ROI 与掩膜统计、边缘策略、长度标定、批处理输出、停止信号、共用推理配置、Qt 页面状态和性能指标显示。Qt 测试使用 offscreen 平台；测试通过不等于已验证真实模型精度或真实视频的跟踪效果。
@@ -274,7 +271,7 @@ conda run --no-capture-output -n BIFBAgent python -m unittest discover -s test -
 不打开界面时，可运行已有默认跟踪脚本：
 
 ```powershell
-conda run --no-capture-output -n BIFBAgent python demo_yolo11.py
+conda run --no-capture-output -n 你的环境名 python demo_yolo11.py
 ```
 
 该脚本使用文件中的 `Args` 默认配置，尚未提供 `--model`、`--source` 等命令行参数。运行前检查模型、输入、输出路径、FPS 和标定值；默认模型为 `3900.pt`，没有默认视频时使用测试图片目录。未指定显式输出路径时，结果保存到带时间戳的子目录。
@@ -301,7 +298,7 @@ git ls-files -ci --exclude-standard
 
 | 现象 | 检查项 |
 | --- | --- |
-| 找不到 `cv2`、`torch` 或 `PySide6` | 确认使用 `BIFBAgent` 环境，并在同一环境安装 `requirements.txt` |
+| 找不到 `cv2`、`torch` 或 `PySide6` | 确认使用环境，并在同一环境安装 `requirements.txt` |
 | `lap` / `cython-bbox` 安装失败 | 检查 Python 版本及对应 wheel；需要本地编译时准备 C/C++ 构建工具 |
 | 找不到模型或输入 | 克隆不包含权重和实验视频；重新选择本机路径 |
 | Gas Holdup 拒绝模型 | 确认模型任务为实例分割，而不是普通目标检测 |
@@ -325,6 +322,6 @@ git ls-files -ci --exclude-standard
 - [FastReID](https://github.com/JDAI-CV/fast-reid)
 - [Qt for Python / PySide6](https://doc.qt.io/qtforpython-6/)
 
-感谢原项目作者及 [海葵云](https://lyh.haikuicloud.com) 提供的项目基础和开发支持。原项目相关应用：[PyPeriShield](https://github.com/kendtank/PyPeriShield)。
+感谢 [原项目作者](https://github.com/kendtank/HkcTracker) 提供的项目基础和开发支持。原项目相关应用：[PyPeriShield](https://github.com/kendtank/PyPeriShield)。
 
-第三方组件遵循各自许可证，详见 [BoT-SORT/LICENSE](BoT-SORT/LICENSE)、[FastReID LICENSE](BoT-SORT/fast_reid/LICENSE)、[YOLOv7 LICENSE](BoT-SORT/yolov7/LICENSE.md) 及各上游项目。当前仓库根目录尚未声明独立的项目许可证。
+第三方组件遵循各自许可证，详见 [BoT-SORT/LICENSE](BoT-SORT/LICENSE)、[FastReID LICENSE](BoT-SORT/fast_reid/LICENSE)、[YOLOv7 LICENSE](BoT-SORT/yolov7/LICENSE.md) 及各上游项目。
